@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A LinkNest bookshelf</title>
+<style>
+  :root {
+    --ink: #1f2d28;
+    --muted: #5d736b;
+    --accent: #208aef;
+    --leaf: #479987;
+    --leaf-dark: #17352f;
+    --leaf-soft: #e9f5f0;
+    --gold: #cda15b;
+    --bg: #fafcfb;
+    --card: #ffffff;
+    --line: #e3ece8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.5;
+    font-size: 16px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 96px; }
+
+  .brand { display: flex; align-items: center; gap: 8px; color: var(--leaf-dark); font-weight: 800; font-size: 18px; margin-bottom: 20px; }
+  .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--leaf); }
+
+  .owner { display: flex; align-items: center; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+  .avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; flex: none; background: var(--leaf-soft);
+            display: flex; align-items: center; justify-content: center; color: var(--leaf); font-weight: 800; font-size: 24px; }
+  .owner h1 { font-size: 22px; margin: 0 0 3px; }
+  .owner .meta { color: var(--muted); font-size: 14px; }
+  .owner .meta .star { color: var(--gold); font-weight: 700; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+  .book { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .cover { aspect-ratio: 3/4; width: 100%; object-fit: cover; background: var(--leaf-soft); }
+  .cover.placeholder { display: flex; align-items: center; justify-content: center; color: var(--leaf); font-weight: 800; font-size: 40px; }
+  .book .body { padding: 10px 12px 12px; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .book .title { font-weight: 700; font-size: 14px; line-height: 1.3; }
+  .book .author { color: var(--muted); font-size: 12px; }
+  .badge { align-self: flex-start; margin-top: 6px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .badge.avail { background: var(--leaf-soft); color: var(--leaf); }
+  .badge.loan { background: #f3ece0; color: #9a7327; }
+  .badge.friends { background: #fbeef1; color: #b5577a; }
+
+  .state { text-align: center; color: var(--muted); padding: 48px 16px; }
+
+  .cta { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line);
+         padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); display: flex; gap: 10px; justify-content: center; }
+  .cta a { text-decoration: none; font-weight: 800; font-size: 15px; padding: 12px 18px; border-radius: 999px; text-align: center; }
+  .cta .primary { background: var(--leaf-dark); color: #fff; flex: 1; max-width: 320px; }
+  .cta .ghost { background: var(--leaf-soft); color: var(--leaf-dark); }
+  footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 28px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><span class="dot"></span> LinkNest</div>
+  <div id="content"><div class="state">Loading shelf…</div></div>
+  <footer>Shared from LinkNest — borrow books from neighbors.</footer>
+</div>
+
+<div class="cta">
+  <a class="ghost" id="openApp" href="#">Open in app</a>
+  <!-- Replace this href with the real App Store listing once it exists. -->
+  <a class="primary" id="getApp" href="https://apps.apple.com/app/linknesty/id000000000">Get LinkNest</a>
+</div>
+
+<script>
+  // Public anon key — safe to expose (RLS + a definer RPC limit what's returned).
+  const SUPABASE_URL = "https://ejdynqnauuxavxohuekg.supabase.co";
+  const SUPABASE_ANON = "sb_publishable_7hIqRWZ_iDOeHosKRzalGA_z66fWh51";
+
+  const params = new URLSearchParams(location.search);
+  const ownerId = params.get("u");
+  const content = document.getElementById("content");
+
+  document.getElementById("openApp").href = ownerId ? "linknest://shelf/" + ownerId : "linknest://";
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function initial(s) { const t = (s || "").trim(); return t ? t[0].toUpperCase() : "?"; }
+
+  function badge(book) {
+    if (book.state === "lending") return '<span class="badge loan">On loan</span>';
+    if (book.visibility === "friends") return '<span class="badge friends">Friends only</span>';
+    return '<span class="badge avail">Available</span>';
+  }
+
+  function render(data) {
+    const owner = data && data.owner;
+    const books = (data && data.books) || [];
+    if (!owner) {
+      content.innerHTML = '<div class="state">This shelf isn\'t available.</div>';
+      return;
+    }
+    const avail = books.filter(function (b) { return b.state === "idle"; }).length;
+    const rep = typeof owner.reputation === "number" ? owner.reputation.toFixed(1) : null;
+    const avatar = owner.avatar_url
+      ? '<img class="avatar" src="' + esc(owner.avatar_url) + '" alt="">'
+      : '<div class="avatar">' + esc(initial(owner.display_name)) + '</div>';
+
+    const head =
+      '<div class="owner">' + avatar + '<div>' +
+        '<h1>' + esc(owner.display_name || "A neighbor") + '’s shelf</h1>' +
+        '<div class="meta">' + books.length + ' book' + (books.length === 1 ? "" : "s") +
+          ' · ' + avail + ' available' +
+          (owner.city ? ' · ' + esc(owner.city) : "") +
+          (rep ? ' · <span class="star">★ ' + rep + '</span>' : "") +
+        '</div>' +
+      '</div></div>';
+
+    const grid = books.length
+      ? '<div class="grid">' + books.map(function (b) {
+          const cover = b.cover_url
+            ? '<img class="cover" src="' + esc(b.cover_url) + '" alt="">'
+            : '<div class="cover placeholder">' + esc(initial(b.title)) + '</div>';
+          return '<div class="book">' + cover + '<div class="body">' +
+            '<div class="title">' + esc(b.title) + '</div>' +
+            (b.author ? '<div class="author">' + esc(b.author) + '</div>' : "") +
+            badge(b) +
+          '</div></div>';
+        }).join("") + '</div>'
+      : '<div class="state">No shared books yet.</div>';
+
+    content.innerHTML = head + grid;
+  }
+
+  if (!ownerId) {
+    content.innerHTML = '<div class="state">Missing shelf link.</div>';
+  } else {
+    fetch(SUPABASE_URL + "/rest/v1/rpc/public_shelf", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON,
+        Authorization: "Bearer " + SUPABASE_ANON,
+      },
+      body: JSON.stringify({ p_owner_id: ownerId }),
+    })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(render)
+      .catch(function () {
+        content.innerHTML = '<div class="state">Couldn\'t load this shelf. Try again later.</div>';
+      });
+  }
+</script>
+</body>
+</html>
