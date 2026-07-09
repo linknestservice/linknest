@@ -39,7 +39,8 @@
   .owner .meta .star { color: var(--gold); font-weight: 700; }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
-  .book { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .book { appearance: none; padding: 0; font: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; text-align: left; color: inherit; cursor: pointer; width: 100%; -webkit-tap-highlight-color: rgba(71, 153, 135, 0.18); touch-action: manipulation; }
+  .book:focus-visible { outline: 3px solid rgba(71, 153, 135, 0.35); outline-offset: 3px; }
   .cover { aspect-ratio: 3/4; width: 100%; object-fit: cover; background: var(--leaf-soft); }
   .cover.placeholder { display: flex; align-items: center; justify-content: center; color: var(--leaf); font-weight: 800; font-size: 40px; }
   .book .body { padding: 10px 12px 12px; flex: 1; display: flex; flex-direction: column; gap: 2px; }
@@ -57,6 +58,32 @@
   .cta a { text-decoration: none; font-weight: 800; font-size: 15px; padding: 12px 18px; border-radius: 999px; text-align: center; }
   .cta .primary { background: var(--leaf-dark); color: #fff; flex: 1; max-width: 320px; }
   .cta .ghost { background: var(--leaf-soft); color: var(--leaf-dark); }
+  .modal { position: fixed; inset: 0; z-index: 20; display: none; align-items: flex-end; background: rgba(23, 53, 47, 0.36); }
+  .modal.open { display: flex; }
+  .sheet { width: 100%; max-height: 88vh; overflow: auto; border-radius: 24px 24px 0 0; background: var(--card);
+           padding: 14px 16px calc(18px + env(safe-area-inset-bottom)); box-shadow: 0 -12px 36px rgba(31, 45, 40, 0.18); }
+  .sheet .grabber { width: 42px; height: 4px; border-radius: 999px; background: var(--line); margin: 0 auto 14px; }
+  .sheet-head { display: flex; gap: 14px; align-items: flex-start; }
+  .detail-cover { width: 104px; flex: none; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--leaf-soft); }
+  .detail-cover .cover { display: block; }
+  .detail-cover .cover.placeholder { height: 138px; }
+  .detail h2 { font-size: 22px; line-height: 1.15; margin: 0 0 4px; }
+  .detail .author { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
+  .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+  .fact { border: 1px solid var(--line); border-radius: 14px; padding: 9px 10px; background: var(--bg); }
+  .fact b { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .fact span { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .sheet-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .sheet-actions a, .sheet-actions button { appearance: none; border: 0; text-decoration: none; font: inherit; font-weight: 800;
+    font-size: 15px; padding: 12px 16px; border-radius: 999px; text-align: center; cursor: pointer; }
+  .sheet-actions .primary { background: var(--leaf-dark); color: #fff; flex: 1; }
+  .sheet-actions .ghost { background: var(--leaf-soft); color: var(--leaf-dark); }
+  .prompt-title { font-size: 21px; margin: 2px 0 6px; }
+  .prompt-body { margin: 0; color: var(--muted); }
+  @media (min-width: 740px) {
+    .modal { align-items: center; justify-content: center; padding: 24px; }
+    .sheet { max-width: 520px; border-radius: 24px; padding-bottom: 18px; }
+  }
   footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 28px; }
 </style>
 </head>
@@ -70,7 +97,27 @@
 <div class="cta">
   <a class="ghost" id="openApp" href="#">Open in app</a>
   <!-- Replace this href with the real App Store listing once it exists. -->
-  <a class="primary" id="getApp" href="https://apps.apple.com/app/linknesty/id000000000">Get LinkNest</a>
+  <a class="primary" id="getApp" href="https://apps.apple.com/app/id6781880891">Get LinkNest</a>
+</div>
+
+<div class="modal" id="bookModal" aria-hidden="true">
+  <div class="sheet detail" role="dialog" aria-modal="true" aria-labelledby="bookTitle">
+    <div class="grabber"></div>
+    <div id="bookDetail"></div>
+  </div>
+</div>
+
+<div class="modal" id="appPrompt" aria-hidden="true">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="promptTitle">
+    <div class="grabber"></div>
+    <h2 class="prompt-title" id="promptTitle">Continue in LinkNest</h2>
+    <p class="prompt-body" id="promptBody">Open or download LinkNest to request this book.</p>
+    <div class="sheet-actions">
+      <button class="ghost" type="button" id="promptClose">Not now</button>
+      <a class="ghost" id="promptOpenApp" href="#">Open app</a>
+      <a class="primary" id="promptGetApp" href="https://apps.apple.com/app/id6781880891">Get LinkNest</a>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -81,8 +128,19 @@
   const params = new URLSearchParams(location.search);
   const ownerId = params.get("u");
   const content = document.getElementById("content");
+  const appStoreUrl = document.getElementById("getApp").href;
+  const bookModal = document.getElementById("bookModal");
+  const bookDetail = document.getElementById("bookDetail");
+  const appPrompt = document.getElementById("appPrompt");
+  const promptBody = document.getElementById("promptBody");
+  const promptOpenApp = document.getElementById("promptOpenApp");
+  const promptGetApp = document.getElementById("promptGetApp");
+  const booksById = {};
+  let lastActivatedBookId = "";
+  let lastActivatedAt = 0;
 
   document.getElementById("openApp").href = ownerId ? "linknest://shelf/" + ownerId : "linknest://";
+  promptGetApp.href = appStoreUrl;
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -90,6 +148,9 @@
     });
   }
   function initial(s) { const t = (s || "").trim(); return t ? t[0].toUpperCase() : "?"; }
+  function field(s) { return s == null || s === "" ? "Not listed" : esc(s); }
+  function closeModal(modal) { modal.classList.remove("open"); modal.setAttribute("aria-hidden", "true"); }
+  function openModal(modal) { modal.classList.add("open"); modal.setAttribute("aria-hidden", "false"); }
 
   function badge(book) {
     if (book.state === "lending") return '<span class="badge loan">On loan</span>';
@@ -97,13 +158,100 @@
     return '<span class="badge avail">Available</span>';
   }
 
+  function statusText(book) {
+    if (book.state === "lending") return "On loan";
+    if (book.visibility === "friends") return "Friends only";
+    return "Available";
+  }
+
+  function actionText(book) {
+    if (book.visibility === "friends") return "Open LinkNest to connect";
+    if (book.state === "lending") return "Open LinkNest for updates";
+    return "Open LinkNest to borrow";
+  }
+
+  function promptText(book) {
+    if (book.visibility === "friends") {
+      return "This book is shared with friends. Open or download LinkNest to connect with the owner.";
+    }
+    if (book.state === "lending") {
+      return "This book is currently on loan. Open or download LinkNest to follow up in the app.";
+    }
+    return "Open or download LinkNest to request this book from the owner.";
+  }
+
+  function activateBookNode(node) {
+    const id = node && node.getAttribute("data-book-id");
+    const book = id && booksById[id];
+    if (!book) return;
+    const now = Date.now();
+    if (id === lastActivatedBookId && now - lastActivatedAt < 650) return;
+    lastActivatedBookId = id;
+    lastActivatedAt = now;
+    openBook(book);
+  }
+
+  function handleBookPointer(event) {
+    const node = event.target && event.target.closest ? event.target.closest("[data-book-id]") : null;
+    if (!node || !content.contains(node)) return;
+    event.preventDefault();
+    activateBookNode(node);
+  }
+
+  function openBookFromElement(node, event) {
+    if (event && event.cancelable) event.preventDefault();
+    activateBookNode(node);
+    return false;
+  }
+  window.openBookFromElement = openBookFromElement;
+
+  function coverMarkup(book, className) {
+    return book.cover_url
+      ? '<img class="' + className + '" src="' + esc(book.cover_url) + '" alt="">'
+      : '<div class="' + className + ' placeholder">' + esc(initial(book.title)) + '</div>';
+  }
+
+  function openBook(book) {
+    const loanPeriod = book.loan_period_days ? book.loan_period_days + " days" : "Not listed";
+    bookDetail.innerHTML =
+      '<div class="sheet-head">' +
+        '<div class="detail-cover">' + coverMarkup(book, "cover") + '</div>' +
+        '<div>' +
+          '<h2 id="bookTitle">' + esc(book.title) + '</h2>' +
+          (book.author ? '<div class="author">' + esc(book.author) + '</div>' : "") +
+          badge(book) +
+        '</div>' +
+      '</div>' +
+      '<div class="facts">' +
+        '<div class="fact"><b>Status</b><span>' + esc(statusText(book)) + '</span></div>' +
+        '<div class="fact"><b>Loan period</b><span>' + esc(loanPeriod) + '</span></div>' +
+        '<div class="fact"><b>Category</b><span>' + field(book.category) + '</span></div>' +
+        '<div class="fact"><b>Condition</b><span>' + field(book.condition) + '</span></div>' +
+        '<div class="fact"><b>Language</b><span>' + field(book.language) + '</span></div>' +
+        '<div class="fact"><b>Published</b><span>' + field(book.published_year) + '</span></div>' +
+      '</div>' +
+      '<div class="sheet-actions">' +
+        '<button class="ghost" type="button" id="detailClose">Close</button>' +
+        '<button class="primary" type="button" id="detailAction">' + esc(actionText(book)) + '</button>' +
+      '</div>';
+    document.getElementById("detailClose").addEventListener("click", function () { closeModal(bookModal); });
+    document.getElementById("detailAction").addEventListener("click", function () {
+      promptOpenApp.href = "linknest://book/" + book.id;
+      promptBody.textContent = promptText(book);
+      openModal(appPrompt);
+    });
+    openModal(bookModal);
+  }
+
   function render(data) {
     const owner = data && data.owner;
-    const books = (data && data.books) || [];
+    const books = ((data && data.books) || []).filter(function (b) { return b.state === "idle"; });
     if (!owner) {
       content.innerHTML = '<div class="state">This shelf isn\'t available.</div>';
       return;
     }
+    Object.keys(booksById).forEach(function (id) { delete booksById[id]; });
+    books.forEach(function (b) { booksById[b.id] = b; });
     const avail = books.filter(function (b) { return b.state === "idle"; }).length;
     const rep = typeof owner.reputation === "number" ? owner.reputation.toFixed(1) : null;
     const avatar = owner.avatar_url
@@ -122,10 +270,8 @@
 
     const grid = books.length
       ? '<div class="grid">' + books.map(function (b) {
-          const cover = b.cover_url
-            ? '<img class="cover" src="' + esc(b.cover_url) + '" alt="">'
-            : '<div class="cover placeholder">' + esc(initial(b.title)) + '</div>';
-          return '<div class="book">' + cover + '<div class="body">' +
+          return '<div class="book" role="button" tabindex="0" data-book-id="' + esc(b.id) + '" onclick="return openBookFromElement(this, event)" ontouchend="return openBookFromElement(this, event)" aria-label="View details for ' + esc(b.title) + '">' +
+            coverMarkup(b, "cover") + '<div class="body">' +
             '<div class="title">' + esc(b.title) + '</div>' +
             (b.author ? '<div class="author">' + esc(b.author) + '</div>' : "") +
             badge(b) +
@@ -135,6 +281,31 @@
 
     content.innerHTML = head + grid;
   }
+
+  content.addEventListener("click", handleBookPointer);
+  content.addEventListener("pointerup", handleBookPointer);
+  content.addEventListener("touchend", handleBookPointer, { passive: false });
+  content.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const node = event.target && event.target.closest ? event.target.closest("[data-book-id]") : null;
+    if (!node || !content.contains(node)) return;
+    event.preventDefault();
+    activateBookNode(node);
+  });
+
+  bookModal.addEventListener("click", function (event) {
+    if (event.target === bookModal) closeModal(bookModal);
+  });
+  appPrompt.addEventListener("click", function (event) {
+    if (event.target === appPrompt) closeModal(appPrompt);
+  });
+  document.getElementById("promptClose").addEventListener("click", function () { closeModal(appPrompt); });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      closeModal(appPrompt);
+      closeModal(bookModal);
+    }
+  });
 
   if (!ownerId) {
     content.innerHTML = '<div class="state">Missing shelf link.</div>';
