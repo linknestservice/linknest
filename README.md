@@ -1,4 +1,4 @@
-# LinkNest Legal
+# LinkNesta Legal
 
 Static legal pages for GitHub Pages.
 

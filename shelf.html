@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>A LinkNest bookshelf</title>
+<title>A LinkNesta bookshelf</title>
 <style>
   :root {
     --ink: #1f2d28;
@@ -89,15 +89,15 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="brand"><span class="dot"></span> LinkNest</div>
+  <div class="brand"><span class="dot"></span> LinkNesta</div>
   <div id="content"><div class="state">Loading shelf…</div></div>
-  <footer>Shared from LinkNest — borrow books from neighbors.</footer>
+  <footer>Shared from LinkNesta — borrow books from neighbors.</footer>
 </div>
 
 <div class="cta">
   <a class="ghost" id="openApp" href="#">Open in app</a>
   <!-- Replace this href with the real App Store listing once it exists. -->
-  <a class="primary" id="getApp" href="https://apps.apple.com/app/id6781880891">Get LinkNest</a>
+  <a class="primary" id="getApp" href="https://apps.apple.com/app/id6781880891">Get LinkNesta</a>
 </div>
 
 <div class="modal" id="bookModal" aria-hidden="true">
@@ -110,12 +110,12 @@
 <div class="modal" id="appPrompt" aria-hidden="true">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="promptTitle">
     <div class="grabber"></div>
-    <h2 class="prompt-title" id="promptTitle">Continue in LinkNest</h2>
-    <p class="prompt-body" id="promptBody">Open or download LinkNest to request this book.</p>
+    <h2 class="prompt-title" id="promptTitle">Continue in LinkNesta</h2>
+    <p class="prompt-body" id="promptBody">Open or download LinkNesta to request this book.</p>
     <div class="sheet-actions">
       <button class="ghost" type="button" id="promptClose">Not now</button>
       <a class="ghost" id="promptOpenApp" href="#">Open app</a>
-      <a class="primary" id="promptGetApp" href="https://apps.apple.com/app/id6781880891">Get LinkNest</a>
+      <a class="primary" id="promptGetApp" href="https://apps.apple.com/app/id6781880891">Get LinkNesta</a>
     </div>
   </div>
 </div>
@@ -165,19 +165,19 @@
   }
 
   function actionText(book) {
-    if (book.visibility === "friends") return "Open LinkNest to connect";
-    if (book.state === "lending") return "Open LinkNest for updates";
-    return "Open LinkNest to borrow";
+    if (book.visibility === "friends") return "Open LinkNesta to connect";
+    if (book.state === "lending") return "Open LinkNesta for updates";
+    return "Open LinkNesta to borrow";
   }
 
   function promptText(book) {
     if (book.visibility === "friends") {
-      return "This book is shared with friends. Open or download LinkNest to connect with the owner.";
+      return "This book is shared with friends. Open or download LinkNesta to connect with the owner.";
     }
     if (book.state === "lending") {
-      return "This book is currently on loan. Open or download LinkNest to follow up in the app.";
+      return "This book is currently on loan. Open or download LinkNesta to follow up in the app.";
     }
-    return "Open or download LinkNest to request this book from the owner.";
+    return "Open or download LinkNesta to request this book from the owner.";
   }
 
   function activateBookNode(node) {
